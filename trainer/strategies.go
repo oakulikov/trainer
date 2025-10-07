@@ -35,6 +35,6 @@ func GetStrategy(name string) (Strategy, error) {
 }
 
 func init() {
-	RegisterStrategy(&BasicStrategy{})
+	RegisterStrategy(&XLDropStrategy{})
 	RegisterStrategy(&XLWithSupportStrategy{})
 }

@@ -13,17 +13,21 @@ import (
 	"time"
 )
 
-const Events = "X/F/L/X/F/F/X/F/F/X/X/F/F/X/X/F/F/X/F/F/X/F/F/X/X/F/F/F/X/F/L/F/X/X/F/F/X/L/L/X/F/L/F/F/F/X/L/F/F/X/X/L/X/F/F/X/F/F/L/F/F/F/L/F/L/X/F/L/F/L/X/L/F/L/F/F/F/L/L/X/X/F/F/F/L/X/L/F/F/X/L/L/F/F/X/X/F/X/L/F/F/F/X/L/X/L/F/L/F/F/L/F/F/X/F/X/X/F/F/F/F/F/X/F/X/L/L/F/F/F/F/L/L/F/L/F/X/F/F/X/L/L/L/X/X/L/L/F/X/F/F/F/F/F/F/F/F/F/L/F/F/X/L/F/F/X/L/X/X/F/X/F/X/L/F/X/F/F/F/X/F/X/F/X/X/X/F/L/L/X/F/F/F/L/F/F/L/F/L/F/X/F/X/F/F/X/F/F/X/F/F/X/F/F/L/F/F/L/F/F/F/F/F/F/F/F/F/F/L/F/L/F/F/F/F/F/F/X/F/F/F/F/F/F/L/F/F/F/F/F/X/F/F/X/X/L/L/L/F/X/X/X/F/L/F/L/X/X/F/X/F/F/F/F/X/F/L/X/L/L/L/F/F/X/F/F/F/F/X/L/L/F/X/F/F/F/F/F/X/F/F/X/F/F/F/F/F/X/L/F/F/L/F/X/X/F/X/L/X/F/F/F/L/L/F/F/F/X/F/L/L/F/L/F/L/F/L"
+const EVENTS = "X/F/L/X/F/F/X/F/F/X/X/F/F/X/X/F/F/X/F/F/X/F/F/X/X/F/F/F/X/F/L/F/X/X/F/F/X/L/L/X/F/L/F/F/F/X/L/F/F/X/X/L/X/F/F/X/F/F/L/F/F/F/L/F/L/X/F/L/F/L/X/L/F/L/F/F/F/L/L/X/X/F/F/F/L/X/L/F/F/X/L/L/F/F/X/X/F/X/L/F/F/F/X/L/X/L/F/L/F/F/L/F/F/X/F/X/X/F/F/F/F/F/X/F/X/L/L/F/F/F/F/L/L/F/L/F/X/F/F/X/L/L/L/X/X/L/L/F/X/F/F/F/F/F/F/F/F/F/L/F/F/X/L/F/F/X/L/X/X/F/X/F/X/L/F/X/F/F/F/X/F/X/F/X/X/X/F/L/L/X/F/F/F/L/F/F/L/F/L/F/X/F/X/F/F/X/F/F/X/F/F/X/F/F/L/F/F/L/F/F/F/F/F/F/F/F/F/F/L/F/L/F/F/F/F/F/F/X/F/F/F/F/F/F/L/F/F/F/F/F/X/F/F/X/X/L/L/L/F/X/X/X/F/L/F/L/X/X/F/X/F/F/F/F/X/F/L/X/L/L/L/F/F/X/F/F/F/F/X/L/L/F/X/F/F/F/F/F/X/F/F/X/F/F/F/F/F/X/L/F/F/L/F/X/X/F/X/L/X/F/F/F/L/L/F/F/F/X/F/L/L/F/L/F/L/F/L"
+const DEFAULT_BET = 10000
 
 // Pattern определяет структуру паттерна
 type Pattern struct {
 	ID          string
 	Description string
-	Sequence    string
 }
 
 // Зарегистрированные паттерны
-var patterns = []Pattern{}
+var patterns = []Pattern{
+	{"RED", "three or more metrics > 20 * DEFAULT_BET"},
+	{"YELLOW", "two or more metrics > 10 * DEFAULT_BET or one metric > 20 * DEFAULT_BET"},
+	{"GREEN", "one metric > 10 * DEFAULT_BET"},
+}
 
 // PatternDetector детектор паттернов
 type PatternDetector struct {
@@ -40,7 +44,7 @@ func NewPatternDetector() *PatternDetector {
 }
 
 // AddEvent добавляет событие и проверяет паттерны
-func (pd *PatternDetector) AddEvent(event string, eventNumber int, ux, ul float64) []string {
+func (pd *PatternDetector) AddEvent(event string, eventNumber int, record TrainerRecord) []string {
 	pd.recentEvents = append(pd.recentEvents, event)
 	if len(pd.recentEvents) > pd.windowSize {
 		pd.recentEvents = pd.recentEvents[1:]
@@ -50,9 +54,10 @@ func (pd *PatternDetector) AddEvent(event string, eventNumber int, ux, ul float6
 
 	// Проверяем паттерны
 	for _, pattern := range patterns {
-		if pd.checkPattern(pattern, ux, ul) {
+		if pd.checkPattern(pattern, record) {
 			detectedPatterns = append(detectedPatterns, pattern.ID)
 			fmt.Printf("⚠️ Событие номер %d: обнаружен паттерн %s - %s\n", eventNumber, pattern.ID, pattern.Description)
+			break
 		}
 	}
 
@@ -60,44 +65,48 @@ func (pd *PatternDetector) AddEvent(event string, eventNumber int, ux, ul float6
 }
 
 // checkPattern проверяет конкретный паттерн
-func (pd *PatternDetector) checkPattern(pattern Pattern, ux, ul float64) bool {
-	switch pattern.Sequence {
-	case "CRITICAL_ACCUMULATION":
-		return ux > 3 && ul > 3
-	case "NON_X_5":
-		return pd.countConsecutive("X") >= 5
-	case "NON_L_5":
-		return pd.countConsecutive("L") >= 5
-	case "F_SERIES_5":
-		return pd.countConsecutiveF() >= 5
+func (pd *PatternDetector) checkPattern(pattern Pattern, record TrainerRecord) bool {
+	metrics := []float64{
+		record.BetF,
+		record.BetX,
+		record.BetL,
+		record.LossF,
+		record.LossX,
+		record.LossL,
+	}
+	switch pattern.ID {
+	case "RED":
+		threshold := 20.0 * DEFAULT_BET
+		count := 0
+		for _, value := range metrics {
+			if value > threshold {
+				count += 1
+			}
+		}
+		return count >= 3
+	case "YELLOW":
+		small_threshold, big_threshold := 10.0*DEFAULT_BET, 20.0*DEFAULT_BET
+		small_count, big_count := 0, 0
+		for _, value := range metrics {
+			if value > big_threshold {
+				big_count += 1
+			}
+			if value > small_threshold {
+				small_count += 1
+			}
+		}
+		return small_count >= 2 || big_count >= 1
+	case "GREEN":
+		threshold := 10.0 * DEFAULT_BET
+		count := 0
+		for _, value := range metrics {
+			if value > threshold {
+				count += 1
+			}
+		}
+		return count >= 1
 	}
 	return false
-}
-
-// countConsecutive считает последовательные события без указанного типа
-func (pd *PatternDetector) countConsecutive(eventType string) int {
-	count := 0
-	for i := len(pd.recentEvents) - 1; i >= 0; i-- {
-		if pd.recentEvents[i] != eventType {
-			count++
-		} else {
-			break
-		}
-	}
-	return count
-}
-
-// countConsecutiveF считает последовательные события F
-func (pd *PatternDetector) countConsecutiveF() int {
-	count := 0
-	for i := len(pd.recentEvents) - 1; i >= 0; i-- {
-		if pd.recentEvents[i] == "F" {
-			count++
-		} else {
-			break
-		}
-	}
-	return count
 }
 
 // TrainerRecord представляет одну запись в CSV
@@ -149,7 +158,7 @@ type Stats struct {
 }
 
 var config = Config{
-	DefaultBetF: 5000,
+	DefaultBetF: DEFAULT_BET,
 	RoundUp:     50,
 	OddsRanges: struct {
 		OddF        Range
@@ -170,10 +179,8 @@ func main() {
 		inputString = flag.String("input", "", "Строка событий F/X/L")
 		outputFile  = flag.String("output", "trainer_output.csv", "Имя выходного CSV файла")
 		verbose     = flag.Bool("verbose", false, "Подробный вывод")
-		debug       = flag.Bool("debug", false, "Режим отладки с детальным логированием")
 		printReport = flag.String("report", "", "Имя входного CSV файла")
-		// lossFXL     = flag.String("loss_fxl", "", "Убытки F,X,L для анализа (например: 5000,10000,20000)")
-		// rateFXL     = flag.String("rate_fxl", "", "Коэффициенты F,X,L для анализа (например: 2,3.5,4)")
+		hockey      = flag.Bool("hockey", false, "События хоккея")
 	)
 	flag.Parse()
 
@@ -183,7 +190,7 @@ func main() {
 	}
 
 	if *inputString == "" {
-		*inputString = Events
+		*inputString = EVENTS
 	}
 
 	// Парсинг событий
@@ -198,7 +205,7 @@ func main() {
 	eventsFromOldest := reverseSlice(events)
 
 	// Генерация записей
-	records := generateRecords(eventsFromOldest, *verbose, *debug)
+	records := generateRecords(eventsFromOldest, *verbose, *hockey)
 
 	// Реверсируем обратно для отображения новых сверху
 	records = reverseRecords(records)
@@ -277,7 +284,7 @@ func calcBet(value, odd float64) float64 {
 }
 
 // generateOdds генерирует коэффициенты с учетом ограничений
-func generateOdds(verbose bool, debug bool) (float64, float64, float64) {
+func generateOdds(verbose, hockey bool) (float64, float64, float64) {
 	rand.Seed(time.Now().UnixNano())
 	maxAttempts := 1000
 
@@ -294,10 +301,8 @@ func generateOdds(verbose bool, debug bool) (float64, float64, float64) {
 			oddX = math.Round(oddX*100) / 100
 			oddL = math.Round(oddL*100) / 100
 
-			// DEBUG: Логируем опасные комбинации коэффициентов
-			if debug && (oddF < 1.85 || oddX < 3.4 || oddL < 4.2) {
-				fmt.Printf("DEBUG ODDS: Опасные коэффициенты - F=%.2f, X=%.2f, L=%.2f, margin=%.3f\n",
-					oddF, oddX, oddL, margin)
+			if hockey {
+				return oddF, oddL, oddX
 			}
 
 			return oddF, oddX, oddL
@@ -306,6 +311,10 @@ func generateOdds(verbose bool, debug bool) (float64, float64, float64) {
 
 	if verbose {
 		fmt.Printf("DEBUG: [generateOdds] fallback to default odds")
+	}
+
+	if hockey {
+		return 2, 4, 3.5
 	}
 
 	// Значения по умолчанию
@@ -321,6 +330,7 @@ func xlWithSupport(current *TrainerRecord, previous *TrainerRecord) {
 	uf := previous.UF
 	ux := previous.UX
 	ul := previous.UL
+	pattern := previous.Pattern
 
 	baseAmount := config.DefaultBetF
 
@@ -339,15 +349,20 @@ func xlWithSupport(current *TrainerRecord, previous *TrainerRecord) {
 	partialCoverage := ""
 
 	if uf > 0 || ux > 0 || ul > 0 {
-		ratio := 0.3
 		realLoss := lossF + lossX + lossL - baseAmount*3
 		lossF = baseAmount
 		lossX = baseAmount
 		lossL = baseAmount
 
-		if ux > 3 && ul > 3 {
-			fullCoverage = "XL"
-		} else {
+		if pattern == "YELLOW" {
+			total -= realLoss
+			realLoss = 0
+		} else if pattern == "RED" {
+			total -= realLoss
+			realLoss = 0
+		}
+		if realLoss > 0 {
+			ratio := 0.3
 			smallPart := roundUp(ratio * realLoss)
 			lossX += smallPart
 			lossL += roundUp(realLoss - smallPart)
@@ -362,9 +377,7 @@ func xlWithSupport(current *TrainerRecord, previous *TrainerRecord) {
 	betL := calcBet(lossL, current.OddL)
 
 	// Корректировка lossF в зависимости от покрытия
-	if fullCoverage == "XL" {
-		lossF += betX + betL
-	} else if fullCoverage == "X" {
+	if fullCoverage == "X" {
 		lossF += betX
 		if partialCoverage == "L" {
 			lossF += betL - baseAmount*2
@@ -386,11 +399,7 @@ func xlWithSupport(current *TrainerRecord, previous *TrainerRecord) {
 		ul++
 		// Потери
 		lossF = 0
-		if fullCoverage == "XL" {
-			// При полном покрытии XL убытки не растут (остаются как есть)
-			// lossX остается прежним
-			// lossL остается прежним
-		} else if fullCoverage == "X" {
+		if fullCoverage == "X" {
 			// X был покрыт полностью, убытки не растут
 			// lossX остается прежним
 			if partialCoverage == "L" {
@@ -445,7 +454,7 @@ func xlWithSupport(current *TrainerRecord, previous *TrainerRecord) {
 }
 
 // generateRecords генерирует записи для событий
-func generateRecords(eventsFromOldest []string, verbose bool, debug bool) []TrainerRecord {
+func generateRecords(eventsFromOldest []string, verbose bool, hockey bool) []TrainerRecord {
 	records := make([]TrainerRecord, len(eventsFromOldest))
 	detector := NewPatternDetector()
 
@@ -456,7 +465,7 @@ func generateRecords(eventsFromOldest []string, verbose bool, debug bool) []Trai
 	}
 
 	for i, event := range eventsFromOldest {
-		oddF, oddX, oddL := generateOdds(verbose, debug)
+		oddF, oddX, oddL := generateOdds(verbose, hockey)
 
 		current := TrainerRecord{
 			EventNumber: i + 1,
@@ -470,7 +479,7 @@ func generateRecords(eventsFromOldest []string, verbose bool, debug bool) []Trai
 		xlWithSupport(&current, &previous)
 
 		// Детектируем паттерны
-		detectedPatterns := detector.AddEvent(event, i+1, previous.UX, previous.UL)
+		detectedPatterns := detector.AddEvent(event, i+1, current)
 		if len(detectedPatterns) > 0 {
 			current.Pattern = strings.Join(detectedPatterns, "_")
 		}
@@ -756,13 +765,6 @@ func printReport(stats Stats, records []TrainerRecord) {
 	fmt.Println("                    📊 ОТЧЕТ ТРЕНАЖЕРА")
 	fmt.Println(strings.Repeat("=", 60))
 
-	fmt.Printf("\n📈 ОБЩАЯ СТАТИСТИКА:\n")
-	fmt.Printf("   Всего записей: %d\n", stats.TotalRecords)
-
-	if len(records) > 0 {
-		fmt.Printf("   Итоговый результат: %.0f\n", records[0].Total)
-	}
-
 	fmt.Printf("\n📊 РАСПРЕДЕЛЕНИЕ СОБЫТИЙ:\n")
 	fmt.Printf("   F: %d (%.1f%%)\n", stats.EventCounts["F"], stats.EventPercentages["F"])
 	fmt.Printf("   X: %d (%.1f%%)\n", stats.EventCounts["X"], stats.EventPercentages["X"])
@@ -784,5 +786,8 @@ func printReport(stats Stats, records []TrainerRecord) {
 	fmt.Printf("   L: %d\n", stats.MaxStreaks["L"])
 	fmt.Printf("   Не-F: %d\n", stats.MaxStreaks["notF"])
 
-	fmt.Println("\n" + strings.Repeat("=", 60))
+	fmt.Printf("   Всего записей: %d\n", stats.TotalRecords)
+	if len(records) > 0 {
+		fmt.Printf("   Итоговый результат: %.0f\n", records[0].Total)
+	}
 }

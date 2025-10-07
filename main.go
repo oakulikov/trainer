@@ -322,7 +322,7 @@ func generateOdds(verbose, hockey bool) (float64, float64, float64) {
 }
 
 // xlWithSupport реализует стратегию "Ставка с поддержкой"
-func xlWithSupport(current *TrainerRecord, previous *TrainerRecord) {
+func xlWithSupport(current, previous *TrainerRecord, hockey bool) {
 	lossF := previous.LossF
 	lossX := previous.LossX
 	lossL := previous.LossL
@@ -358,6 +358,9 @@ func xlWithSupport(current *TrainerRecord, previous *TrainerRecord) {
 			total -= realLoss
 			realLoss = 0
 		} else if pattern == "RED" {
+			total -= realLoss
+			realLoss = 0
+		} else if pattern == "GREEN" {
 			total -= realLoss
 			realLoss = 0
 		}
@@ -476,7 +479,7 @@ func generateRecords(eventsFromOldest []string, verbose bool, hockey bool) []Tra
 		}
 
 		// Применяем стратегию
-		xlWithSupport(&current, &previous)
+		xlWithSupport(&current, &previous, hockey)
 
 		// Детектируем паттерны
 		detectedPatterns := detector.AddEvent(event, i+1, current)

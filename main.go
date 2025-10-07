@@ -15,6 +15,7 @@ import (
 
 const EVENTS = "X/F/L/X/F/F/X/F/F/X/X/F/F/X/X/F/F/X/F/F/X/F/F/X/X/F/F/F/X/F/L/F/X/X/F/F/X/L/L/X/F/L/F/F/F/X/L/F/F/X/X/L/X/F/F/X/F/F/L/F/F/F/L/F/L/X/F/L/F/L/X/L/F/L/F/F/F/L/L/X/X/F/F/F/L/X/L/F/F/X/L/L/F/F/X/X/F/X/L/F/F/F/X/L/X/L/F/L/F/F/L/F/F/X/F/X/X/F/F/F/F/F/X/F/X/L/L/F/F/F/F/L/L/F/L/F/X/F/F/X/L/L/L/X/X/L/L/F/X/F/F/F/F/F/F/F/F/F/L/F/F/X/L/F/F/X/L/X/X/F/X/F/X/L/F/X/F/F/F/X/F/X/F/X/X/X/F/L/L/X/F/F/F/L/F/F/L/F/L/F/X/F/X/F/F/X/F/F/X/F/F/X/F/F/L/F/F/L/F/F/F/F/F/F/F/F/F/F/L/F/L/F/F/F/F/F/F/X/F/F/F/F/F/F/L/F/F/F/F/F/X/F/F/X/X/L/L/L/F/X/X/X/F/L/F/L/X/X/F/X/F/F/F/F/X/F/L/X/L/L/L/F/F/X/F/F/F/F/X/L/L/F/X/F/F/F/F/F/X/F/F/X/F/F/F/F/F/X/L/F/F/L/F/X/X/F/X/L/X/F/F/F/L/L/F/F/F/X/F/L/L/F/L/F/L/F/L"
 const DEFAULT_BET = 10000
+const PARTIAL_COVERAGE_MULT = 2
 
 // Pattern определяет структуру паттерна
 type Pattern struct {
@@ -370,7 +371,7 @@ func xlWithSupport(current, previous *TrainerRecord, hockey bool) {
 			lossX += smallPart
 			lossL += roundUp(realLoss - smallPart)
 			fullCoverage = "X"
-			if lossL > baseAmount*2 {
+			if lossL > baseAmount*PARTIAL_COVERAGE_MULT {
 				partialCoverage = "L"
 			}
 		}
@@ -383,12 +384,12 @@ func xlWithSupport(current, previous *TrainerRecord, hockey bool) {
 	if fullCoverage == "X" {
 		lossF += betX
 		if partialCoverage == "L" {
-			lossF += betL - baseAmount*2
+			lossF += betL - baseAmount*PARTIAL_COVERAGE_MULT
 		}
 	} else if fullCoverage == "L" {
 		lossF += betL
 		if partialCoverage == "X" {
-			lossF += betX - baseAmount*2
+			lossF += betX - baseAmount*PARTIAL_COVERAGE_MULT
 		}
 	}
 
@@ -406,7 +407,7 @@ func xlWithSupport(current, previous *TrainerRecord, hockey bool) {
 			// X был покрыт полностью, убытки не растут
 			// lossX остается прежним
 			if partialCoverage == "L" {
-				lossL += betL - baseAmount*2
+				lossL += betL - baseAmount*PARTIAL_COVERAGE_MULT
 			} else {
 				lossL += betL
 			}
@@ -414,7 +415,7 @@ func xlWithSupport(current, previous *TrainerRecord, hockey bool) {
 			// L был покрыт полностью, убытки не растут
 			// lossL остается прежним
 			if partialCoverage == "X" {
-				lossX += betX - baseAmount*2
+				lossX += betX - baseAmount*PARTIAL_COVERAGE_MULT
 			} else {
 				lossX += betX
 			}

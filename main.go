@@ -15,7 +15,7 @@ import (
 
 const EVENTS = "X/F/L/X/F/F/X/F/F/X/X/F/F/X/X/F/F/X/F/F/X/F/F/X/X/F/F/F/X/F/L/F/X/X/F/F/X/L/L/X/F/L/F/F/F/X/L/F/F/X/X/L/X/F/F/X/F/F/L/F/F/F/L/F/L/X/F/L/F/L/X/L/F/L/F/F/F/L/L/X/X/F/F/F/L/X/L/F/F/X/L/L/F/F/X/X/F/X/L/F/F/F/X/L/X/L/F/L/F/F/L/F/F/X/F/X/X/F/F/F/F/F/X/F/X/L/L/F/F/F/F/L/L/F/L/F/X/F/F/X/L/L/L/X/X/L/L/F/X/F/F/F/F/F/F/F/F/F/L/F/F/X/L/F/F/X/L/X/X/F/X/F/X/L/F/X/F/F/F/X/F/X/F/X/X/X/F/L/L/X/F/F/F/L/F/F/L/F/L/F/X/F/X/F/F/X/F/F/X/F/F/X/F/F/L/F/F/L/F/F/F/F/F/F/F/F/F/F/L/F/L/F/F/F/F/F/F/X/F/F/F/F/F/F/L/F/F/F/F/F/X/F/F/X/X/L/L/L/F/X/X/X/F/L/F/L/X/X/F/X/F/F/F/F/X/F/L/X/L/L/L/F/F/X/F/F/F/F/X/L/L/F/X/F/F/F/F/F/X/F/F/X/F/F/F/F/F/X/L/F/F/L/F/X/X/F/X/L/X/F/F/F/L/L/F/F/F/X/F/L/L/F/L/F/L/F/L"
 const DEFAULT_BET = 10000
-const PARTIAL_COVERAGE_MULT = 2
+const PARTIAL_COVERAGE_MULT = 1
 
 // Pattern определяет структуру паттерна
 type Pattern struct {
@@ -381,7 +381,9 @@ func xlWithSupport(current, previous *TrainerRecord, hockey bool) {
 	betL := calcBet(lossL, current.OddL)
 
 	// Корректировка lossF в зависимости от покрытия
-	if fullCoverage == "X" {
+	if fullCoverage == "XL" {
+		lossF += betX + betL
+	} else if fullCoverage == "X" {
 		lossF += betX
 		if partialCoverage == "L" {
 			lossF += betL - baseAmount*PARTIAL_COVERAGE_MULT
@@ -403,11 +405,13 @@ func xlWithSupport(current, previous *TrainerRecord, hockey bool) {
 		ul++
 		// Потери
 		lossF = 0
-		if fullCoverage == "X" {
+		if fullCoverage == "XL" {
+			// X L были покрыты полностью, убытки не растут
+		} else if fullCoverage == "X" {
 			// X был покрыт полностью, убытки не растут
 			// lossX остается прежним
 			if partialCoverage == "L" {
-				lossL += betL - baseAmount*PARTIAL_COVERAGE_MULT
+				lossL += baseAmount * PARTIAL_COVERAGE_MULT
 			} else {
 				lossL += betL
 			}
@@ -415,7 +419,7 @@ func xlWithSupport(current, previous *TrainerRecord, hockey bool) {
 			// L был покрыт полностью, убытки не растут
 			// lossL остается прежним
 			if partialCoverage == "X" {
-				lossX += betX - baseAmount*PARTIAL_COVERAGE_MULT
+				lossX += baseAmount * PARTIAL_COVERAGE_MULT
 			} else {
 				lossX += betX
 			}

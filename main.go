@@ -364,10 +364,10 @@ func xlWithSupport(current, previous *TrainerRecord, hockey bool) {
 		lossX = baseAmount
 		lossL = baseAmount
 
-		if pattern == "YELLOW" {
+		if pattern == "RED" {
 			total -= realLoss
 			realLoss = 0
-		} else if pattern == "RED" {
+		} else if pattern == "YELLOW" {
 			total -= realLoss
 			realLoss = 0
 		} else if pattern == "GREEN" {

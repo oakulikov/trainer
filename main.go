@@ -177,16 +177,25 @@ var config = Config{
 func main() {
 	// Парсинг аргументов командной строки
 	var (
-		inputString = flag.String("input", "", "Строка событий F/X/L")
-		outputFile  = flag.String("output", "trainer_output.csv", "Имя выходного CSV файла")
-		verbose     = flag.Bool("verbose", false, "Подробный вывод")
-		printReport = flag.String("report", "", "Имя входного CSV файла")
-		hockey      = flag.Bool("hockey", false, "События хоккея")
+		inputString  = flag.String("input", "", "Строка событий F/X/L")
+		outputFile   = flag.String("output", "trainer_output.csv", "Имя выходного CSV файла")
+		verbose      = flag.Bool("verbose", false, "Подробный вывод")
+		printReport  = flag.String("report", "", "Имя входного CSV файла")
+		hockey       = flag.Bool("hockey", false, "События хоккея")
+		runTestsFlag = flag.Bool("test", false, "Запустить тесты из директории tests/")
+		testsDir     = flag.String("tests-dir", "tests", "Директория с тестами")
 	)
 	flag.Parse()
 
 	if *printReport != "" {
 		readCSVAndPrint(*printReport)
+		return
+	}
+
+	if *runTestsFlag {
+		fmt.Printf("🧪 Запуск тестов из директории: %s\n", *testsDir)
+		results := runTests(*testsDir, *verbose, *hockey)
+		printTestResults(results)
 		return
 	}
 

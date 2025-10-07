@@ -1,6 +1,6 @@
 # Testing Framework for Trainer Application
 
-This directory contains test files for the trainer application using the custom testing framework.
+This directory contains test files for the trainer application using Go's standard testing framework.
 
 ## Test File Format
 
@@ -40,17 +40,22 @@ event_number,result,oddF,oddX,oddL,betF,betX,betL,lossF,lossX,lossL,total,uf,ux,
 
 ### Run all tests:
 ```bash
-go run main.go test_runner.go -test
+go test -v .
 ```
 
-### Run tests with verbose output:
+### Run specific test:
 ```bash
-go run main.go test_runner.go -test -verbose
+go test -v -run TestXLWithStrategy/001_simple_test .
 ```
 
-### Run tests from custom directory:
+### Run tests with coverage:
 ```bash
-go run main.go test_runner.go -test -tests-dir /path/to/tests
+go test -v -cover .
+```
+
+### Run tests with race detection:
+```bash
+go test -race -v .
 ```
 
 ## Creating New Tests
@@ -58,12 +63,19 @@ go run main.go test_runner.go -test -tests-dir /path/to/tests
 1. Create an `.input` file with your test data
 2. Run the application manually to generate expected output:
    ```bash
-   go run main.go test_runner.go -input "your/events/here" -output temp.csv
+   go run main.go -input "your/events/here" -output temp.csv
    ```
 3. Copy the content from `temp.csv` to your `.expected` file
-4. Run the test framework to verify
+4. Run the tests to verify:
+   ```bash
+   go test -v .
+   ```
 
 ## Test Examples
+
+### 001_one_event
+- Events: X
+- Tests single event processing
 
 ### 001_simple_test
 - Events: X → F → L
@@ -75,13 +87,14 @@ go run main.go test_runner.go -test -tests-dir /path/to/tests
 - Tests behavior with consecutive F results
 - Verifies streak handling and loss accumulation
 
-## Test Output
+## Test Implementation
 
-The test framework provides:
-- ✅ PASSED / ❌ FAILED status for each test
-- Detailed difference reports for failed tests
-- Summary with pass/fail counts and success rate
-- Verbose mode showing step-by-step processing
+The test framework uses Go's standard testing package with testify for assertions:
+
+- `trainer_test.go` - Main test file in project root with test logic
+- Uses subtests for each input/expected file pair
+- Tests all available strategies
+- Provides detailed error reporting for failed tests
 
 ## Comparison Logic
 
@@ -90,3 +103,12 @@ Tests compare actual vs expected output with tolerance:
 - Bets/Losses/Totals: ±1.0 tolerance
 - Exact match for strings (results, patterns)
 - All fields must match for test to pass
+
+## Adding New Strategies for Testing
+
+To test a new strategy:
+
+1. Add a new test function or extend the existing one
+2. Create a mock implementation of your strategy
+3. Add corresponding test files with expected results
+4. Run tests to verify implementation

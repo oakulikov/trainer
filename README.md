@@ -32,10 +32,9 @@ go run main.go -input "F/X/L/F/F/X/L"
 - `-input` - Строка событий F/X/L, разделенных слешем
 - `-output` - Имя выходного CSV файла (по умолчанию: `trainer_output.csv`)
 - `-verbose` - Подробный вывод процесса обработки
-- `-test` - Запустить тесты из директории tests/
-- `-tests-dir` - Директория с тестами (по умолчанию: `tests`)
 - `-report` - Имя входного CSV файла для генерации отчета
 - `-hockey` - Использовать события хоккея
+- `-strategy` - Имя стратегии для использования (по умолчанию: `xlWithSupport`)
 
 ### Примеры
 
@@ -53,6 +52,23 @@ go run main.go -input "F/X/L/F/F/X/L" -output results.csv
 ```bash
 go run main.go -input "F/X/L/F/F/X/L" -verbose
 ```
+
+4. С определенной стратегией:
+```bash
+go run main.go -input "F/X/L/F/F/X/L" -strategy xlWithSupport
+```
+
+## Структура тестов
+
+Тесты находятся в директории `tests/` и используют стандартную систему тестирования Go:
+
+- `tests/trainer_test.go` - основной файл с тестами
+- `tests/*.input` - файлы с входными данными для тестов
+- `tests/*.expected` - файлы с ожидаемыми результатами
+
+Каждый тест состоит из пары файлов:
+- `test_name.input` - входные данные (события от старых к новым)
+- `test_name.expected` - ожидаемый результат (события от новых к старых)
 
 ## Формат выходных данных
 
@@ -150,17 +166,20 @@ go run main.go -input "X/L/X/L/X/L"
 
 ### Запуск тестов
 
-Приложение включает фреймворк для автоматического тестирования:
+Для запуска тестов используется стандартная команда Go:
 
 ```bash
 # Запустить все тесты
-go run main.go test_runner.go -test
+go test -v .
 
-# Запустить с подробным выводом
-go run main.go test_runner.go -test -verbose
+# Запустить конкретный тест
+go test -v -run TestXLWithStrategy/001_simple_test
 
-# Запустить тесты из другой директории
-go run main.go test_runner.go -test -tests-dir /path/to/tests
+# Запустить тесты с покрытием кода
+go test -v -cover .
+
+# Запустить тесты с детекцией гонок
+go test -race -v .
 ```
 
 ### Формат тестовых файлов
@@ -186,3 +205,10 @@ event_number,result,oddF,oddX,oddL,betF,betX,betL,lossF,lossX,lossL,total,uf,ux,
 ```
 
 Подробная документация по тестированию находится в [`tests/README.md`](tests/README.md).
+
+### Доступные стратегии
+
+- **xlWithSupport** - Стратегия "Ставка с поддержкой" с распределением убытков
+- **basic** - Базовая стратегия с фиксированными ставками
+
+Для создания собственных стратегий см. [`STRATEGY_GUIDE.md`](STRATEGY_GUIDE.md).

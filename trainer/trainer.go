@@ -1,10 +1,8 @@
-package main
+package trainer
 
 import (
 	"encoding/csv"
-	"flag"
 	"fmt"
-	"log"
 	"math"
 	"math/rand"
 	"os"
@@ -13,7 +11,6 @@ import (
 	"time"
 )
 
-const EVENTS = "X/F/L/X/F/F/X/F/F/X/X/F/F/X/X/F/F/X/F/F/X/F/F/X/X/F/F/F/X/F/L/F/X/X/F/F/X/L/L/X/F/L/F/F/F/X/L/F/F/X/X/L/X/F/F/X/F/F/L/F/F/F/L/F/L/X/F/L/F/L/X/L/F/L/F/F/F/L/L/X/X/F/F/F/L/X/L/F/F/X/L/L/F/F/X/X/F/X/L/F/F/F/X/L/X/L/F/L/F/F/L/F/F/X/F/X/X/F/F/F/F/F/X/F/X/L/L/F/F/F/F/L/L/F/L/F/X/F/F/X/L/L/L/X/X/L/L/F/X/F/F/F/F/F/F/F/F/F/L/F/F/X/L/F/F/X/L/X/X/F/X/F/X/L/F/X/F/F/F/X/F/X/F/X/X/X/F/L/L/X/F/F/F/L/F/F/L/F/L/F/X/F/X/F/F/X/F/F/X/F/F/X/F/F/L/F/F/L/F/F/F/F/F/F/F/F/F/F/L/F/L/F/F/F/F/F/F/X/F/F/F/F/F/F/L/F/F/F/F/F/X/F/F/X/X/L/L/L/F/X/X/X/F/L/F/L/X/X/F/X/F/F/F/F/X/F/L/X/L/L/L/F/F/X/F/F/F/F/X/L/L/F/X/F/F/F/F/F/X/F/F/X/F/F/F/F/F/X/L/F/F/L/F/X/X/F/X/L/X/F/F/F/L/L/F/F/F/X/F/L/L/F/L/F/L/F/L"
 const DEFAULT_BET = 10000
 const PARTIAL_COVERAGE_MULT = 1
 
@@ -174,84 +171,94 @@ var config = Config{
 	},
 }
 
-func main() {
-	// Парсинг аргументов командной строки
-	var (
-		inputString  = flag.String("input", "", "Строка событий F/X/L")
-		outputFile   = flag.String("output", "trainer_output.csv", "Имя выходного CSV файла")
-		verbose      = flag.Bool("verbose", false, "Подробный вывод")
-		printReport  = flag.String("report", "", "Имя входного CSV файла")
-		hockey       = flag.Bool("hockey", false, "События хоккея")
-		runTestsFlag = flag.Bool("test", false, "Запустить тесты из директории tests/")
-		testsDir     = flag.String("tests-dir", "tests", "Директория с тестами")
-	)
-	flag.Parse()
+// BasicStrategy простая стратегия без поддержки
+type BasicStrategy struct{}
 
-	if *printReport != "" {
-		readCSVAndPrint(*printReport)
-		return
-	}
-
-	if *runTestsFlag {
-		fmt.Printf("🧪 Запуск тестов из директории: %s\n", *testsDir)
-		results := runTests(*testsDir, *verbose, *hockey)
-		printTestResults(results)
-		return
-	}
-
-	if *inputString == "" {
-		*inputString = EVENTS
-	}
-
-	// Парсинг событий
-	events := parseEvents(*inputString)
-	if len(events) == 0 {
-		log.Fatal("Не найдено корректных событий F/X/L во входной строке")
-	}
-
-	fmt.Printf("📊 Обработка %d событий: %v\n", len(events), strings.Join(events, "/"))
-
-	// Реверсируем для обработки от старых к новым
-	eventsFromOldest := reverseSlice(events)
-
-	// Генерация записей
-	records := generateRecords(eventsFromOldest, *verbose, *hockey)
-
-	// Реверсируем обратно для отображения новых сверху
-	records = reverseRecords(records)
-
-	// Сохранение в CSV
-	if err := saveToCSV(records, *outputFile); err != nil {
-		log.Fatalf("Ошибка сохранения CSV: %v", err)
-	}
-
-	fmt.Printf("✅ Данные сохранены в %s\n", *outputFile)
-
-	// Генерация и вывод статистики
-	generateStatsAndPrint(records, eventsFromOldest)
+func (s *BasicStrategy) Name() string {
+	return "basic"
 }
 
-func readCSVAndPrint(filename string) {
-	records, err := readCSV(filename)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-	eventsFromNewest := []string{}
-	for i := 0; i < len(records); i++ {
-		eventsFromNewest = append(eventsFromNewest, records[i].Result)
-	}
-	// Генерация и вывод статистики
-	generateStatsAndPrint(records, reverseSlice(eventsFromNewest))
+func (s *BasicStrategy) Description() string {
+	return "Базовая стратегия с фиксированными ставками"
 }
 
-func generateStatsAndPrint(records []TrainerRecord, eventsFromOldest []string) {
-	stats := calculateStats(records, eventsFromOldest)
-	printReport(stats, records)
+func (s *BasicStrategy) Calculate(current, previous *TrainerRecord, hockey bool) {
+	baseAmount := config.DefaultBetF
+
+	// Инициализация потерь
+	lossF := baseAmount
+	lossX := baseAmount
+	lossL := baseAmount
+	total := previous.Total
+	uf := previous.UF
+	ux := previous.UX
+	ul := previous.UL
+
+	// Простые фиксированные ставки
+	betF := calcBet(lossF, current.OddF)
+	betX := calcBet(lossX, current.OddX)
+	betL := calcBet(lossL, current.OddL)
+
+	// Обработка результата
+	if current.Result == "F" {
+		uf = 0
+		ux++
+		ul++
+		lossF = 0
+		lossX += betX
+		lossL += betL
+	} else if current.Result == "X" {
+		uf++
+		ux = 0
+		ul++
+		lossF += betF
+		lossX = 0
+		lossL += betL
+	} else if current.Result == "L" {
+		uf++
+		ux++
+		ul = 0
+		lossF += betF
+		lossX += betX
+		lossL = 0
+	}
+	total += baseAmount
+
+	// Обновляем текущую запись
+	current.BetF = betF
+	current.BetX = betX
+	current.BetL = betL
+	current.LossF = lossF
+	current.LossX = lossX
+	current.LossL = lossL
+	current.Total = total
+	current.UF = uf
+	current.UX = ux
+	current.UL = ul
+}
+
+// Регистр доступных стратегий
+var strategies = map[string]Strategy{
+	"xlWithSupport": &XLWithSupportStrategy{},
+	"basic":         &BasicStrategy{},
+}
+
+// GetStrategy возвращает стратегию по имени
+func GetStrategy(name string) (Strategy, error) {
+	strategy, exists := strategies[name]
+	if !exists {
+		availableStrategies := make([]string, 0, len(strategies))
+		for k := range strategies {
+			availableStrategies = append(availableStrategies, k)
+		}
+		return nil, fmt.Errorf("стратегия '%s' не найдена. Доступные стратегии: %s",
+			name, strings.Join(availableStrategies, ", "))
+	}
+	return strategy, nil
 }
 
 // parseEvents парсит строку событий F/X/L
-func parseEvents(input string) []string {
+func ParseEvents(input string) []string {
 	parts := strings.Split(strings.TrimSpace(input), "/")
 	events := []string{}
 
@@ -266,7 +273,7 @@ func parseEvents(input string) []string {
 }
 
 // reverseSlice реверсирует слайс строк
-func reverseSlice(s []string) []string {
+func ReverseSlice(s []string) []string {
 	result := make([]string, len(s))
 	for i, v := range s {
 		result[len(s)-1-i] = v
@@ -275,7 +282,7 @@ func reverseSlice(s []string) []string {
 }
 
 // reverseRecords реверсирует слайс записей
-func reverseRecords(records []TrainerRecord) []TrainerRecord {
+func ReverseRecords(records []TrainerRecord) []TrainerRecord {
 	result := make([]TrainerRecord, len(records))
 	for i, v := range records {
 		result[len(records)-1-i] = v
@@ -331,8 +338,25 @@ func generateOdds(verbose, hockey bool) (float64, float64, float64) {
 	return 2, 3.5, 4
 }
 
-// xlWithSupport реализует стратегию "Ставка с поддержкой"
-func xlWithSupport(current, previous *TrainerRecord, hockey bool) {
+// Strategy интерфейс для различных стратегий ставок
+type Strategy interface {
+	Name() string
+	Description() string
+	Calculate(current, previous *TrainerRecord, hockey bool)
+}
+
+// XLWithSupportStrategy реализует стратегию "Ставка с поддержкой"
+type XLWithSupportStrategy struct{}
+
+func (s *XLWithSupportStrategy) Name() string {
+	return "xlWithSupport"
+}
+
+func (s *XLWithSupportStrategy) Description() string {
+	return "Стратегия 'Ставка с поддержкой' с распределением убытков"
+}
+
+func (s *XLWithSupportStrategy) Calculate(current, previous *TrainerRecord, hockey bool) {
 	lossF := previous.LossF
 	lossX := previous.LossX
 	lossL := previous.LossL
@@ -470,8 +494,8 @@ func xlWithSupport(current, previous *TrainerRecord, hockey bool) {
 	current.UL = ul
 }
 
-// generateRecords генерирует записи для событий
-func generateRecords(eventsFromOldest []string, verbose bool, hockey bool) []TrainerRecord {
+// GenerateRecords генерирует записи для событий
+func GenerateRecords(eventsFromOldest []string, verbose bool, hockey bool, strategy Strategy) []TrainerRecord {
 	records := make([]TrainerRecord, len(eventsFromOldest))
 	detector := NewPatternDetector()
 
@@ -493,7 +517,7 @@ func generateRecords(eventsFromOldest []string, verbose bool, hockey bool) []Tra
 		}
 
 		// Применяем стратегию
-		xlWithSupport(&current, &previous, hockey)
+		strategy.Calculate(&current, &previous, hockey)
 
 		// Детектируем паттерны
 		detectedPatterns := detector.AddEvent(event, i+1, current)
@@ -513,7 +537,8 @@ func generateRecords(eventsFromOldest []string, verbose bool, hockey bool) []Tra
 	return records
 }
 
-func readCSV(filename string) ([]TrainerRecord, error) {
+// ReadCSV читает CSV файл и возвращает записи
+func ReadCSV(filename string) ([]TrainerRecord, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, err
@@ -640,8 +665,8 @@ func readCSV(filename string) ([]TrainerRecord, error) {
 	return trainerRecords, nil
 }
 
-// saveToCSV сохраняет записи в CSV файл
-func saveToCSV(records []TrainerRecord, filename string) error {
+// SaveToCSV сохраняет записи в CSV файл
+func SaveToCSV(records []TrainerRecord, filename string) error {
 	file, err := os.Create(filename)
 	if err != nil {
 		return err
@@ -686,8 +711,8 @@ func saveToCSV(records []TrainerRecord, filename string) error {
 	return nil
 }
 
-// calculateStats вычисляет статистику
-func calculateStats(records []TrainerRecord, eventsFromOldest []string) Stats {
+// CalculateStats вычисляет статистику
+func CalculateStats(records []TrainerRecord, eventsFromOldest []string) Stats {
 	stats := Stats{
 		TotalRecords:     len(records),
 		EventCounts:      make(map[string]int),
@@ -776,8 +801,8 @@ func calculateStats(records []TrainerRecord, eventsFromOldest []string) Stats {
 	return stats
 }
 
-// printReport выводит отчет
-func printReport(stats Stats, records []TrainerRecord) {
+// PrintReport выводит отчет
+func PrintReport(stats Stats, records []TrainerRecord) {
 	fmt.Println("\n" + strings.Repeat("=", 60))
 	fmt.Println("                    📊 ОТЧЕТ ТРЕНАЖЕРА")
 	fmt.Println(strings.Repeat("=", 60))
@@ -807,4 +832,54 @@ func printReport(stats Stats, records []TrainerRecord) {
 	if len(records) > 0 {
 		fmt.Printf("   Итоговый результат: %.0f\n", records[0].Total)
 	}
+}
+
+// GenerateRecordsWithOdds генерирует записи для событий с заданными коэффициентами
+func GenerateRecordsWithOdds(eventsFromOldest []string, odds []struct{ OddF, OddX, OddL float64 }, verbose bool, hockey bool, strategy Strategy) []TrainerRecord {
+	records := make([]TrainerRecord, len(eventsFromOldest))
+	detector := NewPatternDetector()
+
+	// Начальная запись (предыдущая для первого события)
+	previous := TrainerRecord{
+		Result: "N",
+		Total:  0,
+	}
+
+	for i, event := range eventsFromOldest {
+		var oddF, oddX, oddL float64
+		if i < len(odds) {
+			oddF = odds[i].OddF
+			oddX = odds[i].OddX
+			oddL = odds[i].OddL
+		} else {
+			oddF, oddX, oddL = generateOdds(verbose, hockey)
+		}
+
+		current := TrainerRecord{
+			EventNumber: i + 1,
+			Result:      event,
+			OddF:        oddF,
+			OddX:        oddX,
+			OddL:        oddL,
+		}
+
+		// Применяем стратегию
+		strategy.Calculate(&current, &previous, hockey)
+
+		// Детектируем паттерны
+		detectedPatterns := detector.AddEvent(event, i+1, current)
+		if len(detectedPatterns) > 0 {
+			current.Pattern = strings.Join(detectedPatterns, "_")
+		}
+
+		records[i] = current
+		previous = current
+
+		if verbose {
+			fmt.Printf("Событие %d: %s, Ставки: F=%.0f X=%.0f L=%.0f, Total=%.0f\n",
+				i+1, event, current.BetF, current.BetX, current.BetL, current.Total)
+		}
+	}
+
+	return records
 }

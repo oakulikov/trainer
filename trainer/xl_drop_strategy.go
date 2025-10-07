@@ -1,5 +1,7 @@
 package trainer
 
+import "fmt"
+
 // XLDropStrategy реализует стратегию "Ставка с ограниченной поддержкой"
 type XLDropStrategy struct{}
 
@@ -11,7 +13,13 @@ func (s *XLDropStrategy) Description() string {
 	return "Стратегия 'Ставка с ограниченной поддержкой' с пессимизацией страховки"
 }
 
-func (s *XLDropStrategy) Calculate(current, previous *TrainerRecord, hockey bool) {
+func (s *XLDropStrategy) Calculate(current, previous *TrainerRecord, flags Flags) {
+	if flags.Debug {
+		fmt.Printf("\n=== DEBUG: Calculate with strategy %s ===\n", s.Name())
+	}
+
+	eventNumber := current.EventNumber
+
 	lossF := previous.LossF
 	lossX := previous.LossX
 	lossL := previous.LossL
@@ -50,6 +58,11 @@ func (s *XLDropStrategy) Calculate(current, previous *TrainerRecord, hockey bool
 		lossX = baseAmount
 		lossL = baseAmount
 
+		if flags.Debug {
+			fmt.Printf("DEBUG: Event %d: lossF: %.0f, lossX: %.0f, lossL: %.0f\n", eventNumber, lossF, lossX, lossL)
+			fmt.Printf("DEBUG: Event %d: realLoss BEFORE patterns %.0f\n", eventNumber, realLoss)
+		}
+
 		// GREEN: метрика > 50,000
 		// YELLOW: 2+ метрики > 50,000 ИЛИ любая > 100,000
 		// RED: 3+ метрики > 100,000 (катастрофа)
@@ -60,29 +73,48 @@ func (s *XLDropStrategy) Calculate(current, previous *TrainerRecord, hockey bool
 			total -= realLoss
 			realLoss = 0
 		} else if pattern == "GREEN" {
-			total -= realLoss
-			realLoss = 0
+			// total -= realLoss
+			// realLoss = 0
+			// partLoss := roundUp(realLoss / 2)
+			// total -= partLoss
+			// realLoss -= partLoss
 		}
+
+		if flags.Debug {
+			fmt.Printf("DEBUG: Event %d: realLoss AFTER patterns %.0f\n", eventNumber, realLoss)
+		}
+
 		if realLoss > 0 {
 			ratio := 0.3
 			smallPart := roundUp(ratio * realLoss)
+			bigPart := roundUp(realLoss - smallPart)
+
+			if flags.Debug {
+				fmt.Printf("DEBUG: Event %d: ratio: %.2f, smallPart: %.0f, bigPart: %.0f\n", eventNumber, ratio, smallPart, bigPart)
+			}
+
 			if ux < 5 {
 				lossX += smallPart
 				if ux > 0 {
-					coverageRatio["X"] = 1 / ux
+					coverageRatio["X"] = 0
 				}
 			} else {
 				deferLoss["X"] = smallPart
 			}
 			if ul < 6 {
-				lossL += roundUp(realLoss - smallPart)
+				lossL += bigPart
 				if ul > 0 {
-					coverageRatio["L"] = 1 / ul
+					coverageRatio["L"] = 0
 				}
 			} else {
-				deferLoss["L"] = roundUp(realLoss - smallPart)
+				deferLoss["L"] = bigPart
 			}
 		}
+	}
+
+	if flags.Debug {
+		fmt.Printf("DEBUG: Event %d: coverageRatio_X: %.2f, deferLoss_X: %.0f\n", eventNumber, coverageRatio["X"], deferLoss["X"])
+		fmt.Printf("DEBUG: Event %d: coverageRatio_L: %.2f, deferLoss_L: %.0f\n", eventNumber, coverageRatio["L"], deferLoss["L"])
 	}
 
 	betX := calcBet(lossX, current.OddX)
@@ -95,6 +127,13 @@ func (s *XLDropStrategy) Calculate(current, previous *TrainerRecord, hockey bool
 	lossF += coverL
 
 	betF := calcBet(lossF, current.OddF)
+
+	if flags.Debug {
+		fmt.Printf("DEBUG: Event %d: lossF: %.0f, lossX: %.0f, lossL: %.0f\n", eventNumber, lossF, lossX, lossL)
+		fmt.Printf("DEBUG: Event %d: betF: %.0f, betX: %.0f, betL: %.0f\n", eventNumber, betF, betX, betL)
+		fmt.Printf("DEBUG: Event %d: coverX: %.0f, coverL: %.0f\n", eventNumber, coverX, coverL)
+		fmt.Printf("DEBUG: Event %d: total BEFORE process %.0f\n", eventNumber, total)
+	}
 
 	// Обработка результата
 	if current.Result == "F" {
@@ -128,7 +167,16 @@ func (s *XLDropStrategy) Calculate(current, previous *TrainerRecord, hockey bool
 	if deferLoss[current.Result] > 0 {
 		total -= deferLoss[current.Result]
 	}
+
+	if flags.Debug {
+		fmt.Printf("DEBUG: Event %d: total AFTER deferLoss %.0f\n", eventNumber, total)
+	}
+
 	total += baseAmount
+
+	if flags.Debug {
+		fmt.Printf("DEBUG: Event %d: total FINAL %.0f\n", eventNumber, total)
+	}
 
 	// Обновляем текущую запись
 	current.BetF = betF

@@ -11,7 +11,7 @@ func (s *XLWithSupportStrategy) Description() string {
 	return "Стратегия 'Ставка с поддержкой' с распределением убытков"
 }
 
-func (s *XLWithSupportStrategy) Calculate(current, previous *TrainerRecord, hockey bool) {
+func (s *XLWithSupportStrategy) Calculate(current, previous *TrainerRecord, flags Flags) {
 	lossF := previous.LossF
 	lossX := previous.LossX
 	lossL := previous.LossL

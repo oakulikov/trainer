@@ -9,7 +9,7 @@ import (
 type Strategy interface {
 	Name() string
 	Description() string
-	Calculate(current, previous *TrainerRecord, hockey bool)
+	Calculate(current, previous *TrainerRecord, flags Flags)
 }
 
 // Регистр доступных стратегий

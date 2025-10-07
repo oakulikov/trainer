@@ -1,4 +1,4 @@
-package tests
+package testsdrop
 
 import (
 	"bufio"
@@ -20,6 +20,7 @@ var debug = flag.Bool("debug", false, "enable debug output for tests")
 
 // TestRegressionSuite runs all regression tests from .input/.expected files
 func TestRegressionSuite(t *testing.T) {
+	// Явно вызываем flag.Parse() чтобы обработать флаги
 	flag.Parse()
 
 	// Find all .input files in the current directory
@@ -39,21 +40,10 @@ func TestRegressionSuite(t *testing.T) {
 			inputPath := testFile
 			expectedPath := strings.TrimSuffix(testFile, ".input") + ".expected"
 
-			if *debug {
-				fmt.Printf("\n=== DEBUG: Processing test file %s ===\n", testFile)
-			}
-
 			// Read the input events
 			inputEvents, err := readInputFile(inputPath)
 			if err != nil {
 				t.Fatalf("Failed to read input file %s: %v", inputPath, err)
-			}
-
-			if *debug {
-				fmt.Printf("Input events (%d):\n", len(inputEvents))
-				for i, event := range inputEvents {
-					fmt.Printf("  %d: %s,%.2f,%.2f,%.2f\n", i+1, event.Result, event.OddF, event.OddX, event.OddL)
-				}
 			}
 
 			// Read the expected output
@@ -62,38 +52,19 @@ func TestRegressionSuite(t *testing.T) {
 				t.Fatalf("Failed to read expected file %s: %v", expectedPath, err)
 			}
 
-			if *debug {
-				fmt.Printf("Expected output (%d records):\n", len(expectedOutput))
-				for i, record := range expectedOutput {
-					fmt.Printf("  %d: %s,%s,%.2f,%.2f,%.2f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f\n",
-						i+1, record.Result, record.Pattern, record.OddF, record.OddX, record.OddL,
-						record.BetF, record.BetX, record.BetL, record.LossF, record.LossX, record.LossL,
-						record.Total, record.UF, record.UX, record.UL)
-				}
-			}
-
 			// Process the input events and generate actual output
 			actualOutput, err := processInputEvents(inputEvents, *debug)
 			if err != nil {
 				t.Fatalf("Failed to process input events: %v", err)
 			}
 
-			if *debug {
-				fmt.Printf("Actual output (%d records):\n", len(actualOutput))
-				for i, record := range actualOutput {
-					fmt.Printf("  %d: %s,%s,%.2f,%.2f,%.2f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f\n",
-						i+1, record.Result, record.Pattern, record.OddF, record.OddX, record.OddL,
-						record.BetF, record.BetX, record.BetL, record.LossF, record.LossX, record.LossL,
-						record.Total, record.UF, record.UX, record.UL)
-				}
-			}
+			// Сохранение в CSV
+			// if err := trainer.SaveToCSV(actualOutput, strings.TrimSuffix(testFile, ".input")+".actual"); err != nil {
+			// 	t.Fatalf("Ошибка сохранения CSV: %v", err)
+			// }
 
 			// Compare the actual output with expected output
 			assert.Equal(t, expectedOutput, actualOutput, "Output mismatch for %s", testFile)
-
-			if *debug {
-				fmt.Printf("=== DEBUG: Test %s completed ===\n\n", testFile)
-			}
 		})
 	}
 }
@@ -166,11 +137,6 @@ func readExpectedFile(filename string) ([]trainer.TrainerRecord, error) {
 
 // processInputEvents processes input events and generates output rows using the trainer package
 func processInputEvents(events []Event, debug bool) ([]trainer.TrainerRecord, error) {
-	if debug {
-		fmt.Printf("\n=== DEBUG: Starting event processing ===\n")
-		fmt.Printf("Processing %d events with xlWithSupport strategy\n", len(events))
-	}
-
 	// Convert events to the format expected by the trainer package
 	eventStrings := make([]string, len(events))
 	odds := make([]struct{ OddF, OddX, OddL float64 }, len(events))
@@ -185,15 +151,9 @@ func processInputEvents(events []Event, debug bool) ([]trainer.TrainerRecord, er
 	}
 
 	// Get the default strategy
-	strategy, err := trainer.GetStrategy("xlWithSupport")
+	strategy, err := trainer.GetStrategy("xlDrop")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get strategy: %v", err)
-	}
-
-	if debug {
-		fmt.Printf("Strategy loaded: %s - %s\n", strategy.Name(), strategy.Description())
-		fmt.Printf("Event sequence (oldest to newest): %s\n", strings.Join(eventStrings, "/"))
-		fmt.Printf("\n=== DEBUG: Step-by-step processing ===\n")
 	}
 
 	// Create flags structure
@@ -204,7 +164,7 @@ func processInputEvents(events []Event, debug bool) ([]trainer.TrainerRecord, er
 		Debug:    debug,
 		Report:   "",
 		Hockey:   false,
-		Strategy: "xlWithSupport",
+		Strategy: "xlDrop",
 	}
 
 	// Generate records using the trainer package with specified odds
@@ -222,17 +182,6 @@ func processInputEvents(events []Event, debug bool) ([]trainer.TrainerRecord, er
 
 	// Reverse records to match expected format (newest first)
 	records = trainer.ReverseRecords(records)
-
-	if debug {
-		fmt.Printf("\n=== DEBUG: Final records (newest to oldest) ===\n")
-		for i, record := range records {
-			fmt.Printf("Record %d: %s,%s,%.2f,%.2f,%.2f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f\n",
-				i+1, record.Result, record.Pattern, record.OddF, record.OddX, record.OddL,
-				record.BetF, record.BetX, record.BetL, record.LossF, record.LossX, record.LossL,
-				record.Total, record.UF, record.UX, record.UL)
-		}
-		fmt.Printf("=== DEBUG: Event processing completed ===\n\n")
-	}
 
 	return records, nil
 }

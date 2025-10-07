@@ -11,6 +11,17 @@ import (
 	"time"
 )
 
+// Flags содержит все флаги командной строки
+type Flags struct {
+	Input    string
+	Output   string
+	Verbose  bool
+	Debug    bool
+	Report   string
+	Hockey   bool
+	Strategy string
+}
+
 const DEFAULT_BET = 10000
 const PARTIAL_COVERAGE_MULT = 1
 
@@ -215,7 +226,7 @@ func calcBet(value, odd float64) float64 {
 }
 
 // generateOdds генерирует коэффициенты с учетом ограничений
-func generateOdds(verbose, hockey bool) (float64, float64, float64) {
+func generateOdds(flags Flags) (float64, float64, float64) {
 	rand.Seed(time.Now().UnixNano())
 	maxAttempts := 1000
 
@@ -232,7 +243,7 @@ func generateOdds(verbose, hockey bool) (float64, float64, float64) {
 			oddX = math.Round(oddX*100) / 100
 			oddL = math.Round(oddL*100) / 100
 
-			if hockey {
+			if flags.Hockey {
 				return oddF, oddL, oddX
 			}
 
@@ -240,11 +251,11 @@ func generateOdds(verbose, hockey bool) (float64, float64, float64) {
 		}
 	}
 
-	if verbose {
+	if flags.Debug {
 		fmt.Printf("DEBUG: [generateOdds] fallback to default odds")
 	}
 
-	if hockey {
+	if flags.Hockey {
 		return 2, 4, 3.5
 	}
 
@@ -253,7 +264,7 @@ func generateOdds(verbose, hockey bool) (float64, float64, float64) {
 }
 
 // GenerateRecords генерирует записи для событий
-func GenerateRecords(eventsFromOldest []string, verbose bool, hockey bool, strategy Strategy) []TrainerRecord {
+func GenerateRecords(eventsFromOldest []string, flags Flags, strategy Strategy) []TrainerRecord {
 	records := make([]TrainerRecord, len(eventsFromOldest))
 	detector := NewPatternDetector()
 
@@ -264,7 +275,7 @@ func GenerateRecords(eventsFromOldest []string, verbose bool, hockey bool, strat
 	}
 
 	for i, event := range eventsFromOldest {
-		oddF, oddX, oddL := generateOdds(verbose, hockey)
+		oddF, oddX, oddL := generateOdds(flags)
 
 		current := TrainerRecord{
 			EventNumber: i + 1,
@@ -275,7 +286,7 @@ func GenerateRecords(eventsFromOldest []string, verbose bool, hockey bool, strat
 		}
 
 		// Применяем стратегию
-		strategy.Calculate(&current, &previous, hockey)
+		strategy.Calculate(&current, &previous, flags)
 
 		// Детектируем паттерны
 		detectedPatterns := detector.AddEvent(event, i+1, current)
@@ -286,7 +297,7 @@ func GenerateRecords(eventsFromOldest []string, verbose bool, hockey bool, strat
 		records[i] = current
 		previous = current
 
-		if verbose {
+		if flags.Verbose {
 			fmt.Printf("Событие %d: %s, Ставки: F=%.0f X=%.0f L=%.0f, Total=%.0f\n",
 				i+1, event, current.BetF, current.BetX, current.BetL, current.Total)
 		}
@@ -593,14 +604,23 @@ func PrintReport(stats Stats, records []TrainerRecord) {
 }
 
 // GenerateRecordsWithOdds генерирует записи для событий с заданными коэффициентами
-func GenerateRecordsWithOdds(eventsFromOldest []string, odds []struct{ OddF, OddX, OddL float64 }, verbose bool, hockey bool, strategy Strategy) []TrainerRecord {
+func GenerateRecordsWithOdds(eventsFromOldest []string, odds []struct{ OddF, OddX, OddL float64 }, flags Flags, strategy Strategy) []TrainerRecord {
 	records := make([]TrainerRecord, len(eventsFromOldest))
 	detector := NewPatternDetector()
+
+	if flags.Debug {
+		fmt.Printf("DEBUG: Starting GenerateRecordsWithOdds with %d events\n", len(eventsFromOldest))
+		fmt.Printf("DEBUG: Strategy: %s\n", strategy.Name())
+	}
 
 	// Начальная запись (предыдущая для первого события)
 	previous := TrainerRecord{
 		Result: "N",
 		Total:  0,
+	}
+
+	if flags.Debug {
+		fmt.Printf("DEBUG: Initial previous record: Result=%s, Total=%.0f\n", previous.Result, previous.Total)
 	}
 
 	for i, event := range eventsFromOldest {
@@ -609,8 +629,14 @@ func GenerateRecordsWithOdds(eventsFromOldest []string, odds []struct{ OddF, Odd
 			oddF = odds[i].OddF
 			oddX = odds[i].OddX
 			oddL = odds[i].OddL
+			if flags.Debug {
+				fmt.Printf("DEBUG: Event %d: Using provided odds - F=%.2f, X=%.2f, L=%.2f\n", i+1, oddF, oddX, oddL)
+			}
 		} else {
-			oddF, oddX, oddL = generateOdds(verbose, hockey)
+			oddF, oddX, oddL = generateOdds(flags)
+			if flags.Debug {
+				fmt.Printf("DEBUG: Event %d: Generated odds - F=%.2f, X=%.2f, L=%.2f\n", i+1, oddF, oddX, oddL)
+			}
 		}
 
 		current := TrainerRecord{
@@ -621,22 +647,41 @@ func GenerateRecordsWithOdds(eventsFromOldest []string, odds []struct{ OddF, Odd
 			OddL:        oddL,
 		}
 
+		if flags.Debug {
+			fmt.Printf("DEBUG: Event %d: Before strategy calculation - Result=%s, Previous: UF=%.0f, UX=%.0f, UL=%.0f, LossF=%.0f, LossX=%.0f, LossL=%.0f, Total=%.0f\n",
+				i+1, event, previous.UF, previous.UX, previous.UL, previous.LossF, previous.LossX, previous.LossL, previous.Total)
+		}
+
 		// Применяем стратегию
-		strategy.Calculate(&current, &previous, hockey)
+		strategy.Calculate(&current, &previous, flags)
+
+		if flags.Debug {
+			fmt.Printf("DEBUG: Event %d: After strategy calculation - BetF=%.0f, BetX=%.0f, BetL=%.0f, LossF=%.0f, LossX=%.0f, LossL=%.0f, Total=%.0f, UF=%.0f, UX=%.0f, UL=%.0f\n",
+				i+1, current.BetF, current.BetX, current.BetL, current.LossF, current.LossX, current.LossL, current.Total, current.UF, current.UX, current.UL)
+		}
 
 		// Детектируем паттерны
 		detectedPatterns := detector.AddEvent(event, i+1, current)
 		if len(detectedPatterns) > 0 {
 			current.Pattern = strings.Join(detectedPatterns, "_")
+			if flags.Debug {
+				fmt.Printf("DEBUG: Event %d: Pattern detected - %s\n", i+1, current.Pattern)
+			}
 		}
 
 		records[i] = current
 		previous = current
 
-		if verbose {
-			fmt.Printf("Событие %d: %s, Ставки: F=%.0f X=%.0f L=%.0f, Total=%.0f\n",
-				i+1, event, current.BetF, current.BetX, current.BetL, current.Total)
+		if flags.Debug {
+			fmt.Printf("DEBUG: Event %d: Complete record - %s,%.2f,%.2f,%.2f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f\n",
+				i+1, current.Result, current.OddF, current.OddX, current.OddL,
+				current.BetF, current.BetX, current.BetL, current.LossF, current.LossX, current.LossL,
+				current.Total, current.UF, current.UX, current.UL)
 		}
+	}
+
+	if flags.Debug {
+		fmt.Printf("DEBUG: GenerateRecordsWithOdds completed, generated %d records\n", len(records))
 	}
 
 	return records

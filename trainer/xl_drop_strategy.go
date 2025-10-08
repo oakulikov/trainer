@@ -95,17 +95,11 @@ func (s *XLDropStrategy) Calculate(current, previous *TrainerRecord, flags Flags
 
 			if ux < 5 {
 				lossX += smallPart
-				if ux > 0 {
-					coverageRatio["X"] = 0
-				}
 			} else {
 				deferLoss["X"] = smallPart
 			}
 			if ul < 6 {
 				lossL += bigPart
-				if ul > 0 {
-					coverageRatio["L"] = 0
-				}
 			} else {
 				deferLoss["L"] = bigPart
 			}
@@ -165,11 +159,16 @@ func (s *XLDropStrategy) Calculate(current, previous *TrainerRecord, flags Flags
 		lossL = 0
 	}
 	if deferLoss[current.Result] > 0 {
-		total -= deferLoss[current.Result]
+		if current.Result == "X" {
+			lossX += deferLoss["X"]
+		}
+		if current.Result == "L" {
+			lossL += deferLoss["L"]
+		}
 	}
 
 	if flags.Debug {
-		fmt.Printf("DEBUG: Event %d: total AFTER deferLoss %.0f\n", eventNumber, total)
+		fmt.Printf("DEBUG: Event %d: lossX: %.0f, lossL: %.0f AFTER deferLoss\n", eventNumber, lossX, lossL)
 	}
 
 	total += baseAmount

@@ -63,8 +63,9 @@ func (s *XLDropStrategy) Calculate(current, previous *TrainerRecord, flags Flags
 		// YELLOW: 2+ метрики > 50,000 ИЛИ любая > 100,000
 		// RED: 3+ метрики > 100,000 (катастрофа)
 		if pattern == "RED" {
-			total -= realLoss
-			realLoss = 0
+			halfPart := roundUp(realLoss / 2)
+			total -= halfPart
+			realLoss = halfPart
 		} else if pattern == "YELLOW" {
 			// total -= realLoss
 			// realLoss = 0
@@ -89,16 +90,8 @@ func (s *XLDropStrategy) Calculate(current, previous *TrainerRecord, flags Flags
 				fmt.Printf("DEBUG: Event %d: ratio: %.2f, smallPart: %.0f, bigPart: %.0f\n", eventNumber, ratio, smallPart, bigPart)
 			}
 
-			if ux < 5 {
-				lossX += smallPart
-			} else {
-				deferLoss["X"] = smallPart
-			}
-			if ul < 6 {
-				lossL += bigPart
-			} else {
-				deferLoss["L"] = bigPart
-			}
+			lossX += smallPart
+			lossL += bigPart
 		}
 	}
 
@@ -107,8 +100,20 @@ func (s *XLDropStrategy) Calculate(current, previous *TrainerRecord, flags Flags
 	}
 
 	betF := calcBet(lossF, current.OddF)
-	betX := calcBet(lossX, current.OddX)
-	betL := calcBet(lossL, current.OddL)
+	betX, betL := 0.0, 0.0
+
+	realBetX := calcBet(lossX, current.OddX)
+	realBetL := calcBet(lossL, current.OddL)
+	if ux < 5 {
+		betX = realBetX
+	} else {
+		deferLoss["X"] = realBetX
+	}
+	if ul < 6 {
+		betL = realBetL
+	} else {
+		deferLoss["L"] = realBetL
+	}
 
 	if flags.Debug {
 		fmt.Printf("DEBUG: Event %d: lossF: %.0f, lossX: %.0f, lossL: %.0f\n", eventNumber, lossF, lossX, lossL)
@@ -126,16 +131,22 @@ func (s *XLDropStrategy) Calculate(current, previous *TrainerRecord, flags Flags
 		lossF = 0
 		lossX += betX
 		lossL += betL
-	} else if current.Result == "X" {
+		total += baseAmount
+	}
+	if current.Result == "X" {
 		// Серии
 		uf++
 		ux = 0
 		ul++
 		// Потери
 		lossF += betF
-		lossX = 0
 		lossL += betL
-	} else if current.Result == "L" {
+		if deferLoss["X"] == 0 {
+			lossX = 0
+			total += baseAmount
+		}
+	}
+	if current.Result == "L" {
 		// Серии
 		uf++
 		ux++
@@ -143,22 +154,11 @@ func (s *XLDropStrategy) Calculate(current, previous *TrainerRecord, flags Flags
 		// Потери
 		lossF += betF
 		lossX += betX
-		lossL = 0
-	}
-	if deferLoss[current.Result] > 0 {
-		if current.Result == "X" {
-			lossX += deferLoss["X"]
-		}
-		if current.Result == "L" {
-			lossL += deferLoss["L"]
+		if deferLoss["L"] == 0 {
+			lossL = 0
+			total += baseAmount
 		}
 	}
-
-	if flags.Debug {
-		fmt.Printf("DEBUG: Event %d: lossX: %.0f, lossL: %.0f AFTER deferLoss\n", eventNumber, lossX, lossL)
-	}
-
-	total += baseAmount
 
 	if flags.Debug {
 		fmt.Printf("DEBUG: Event %d: total FINAL %.0f\n", eventNumber, total)

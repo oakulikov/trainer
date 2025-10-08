@@ -33,6 +33,10 @@ func TestRegressionSuite(t *testing.T) {
 
 	for _, testFile := range testFiles {
 		t.Run(testFile, func(t *testing.T) {
+			fileName := filepath.Base(testFile)
+			parts := strings.Split(fileName, "_")
+			strategyName := parts[0]
+
 			// Construct paths for .input and .expected files
 			inputPath := testFile
 			expectedPath := strings.TrimSuffix(testFile, ".input") + ".expected"
@@ -78,7 +82,7 @@ func TestRegressionSuite(t *testing.T) {
 				Debug:    *debug,
 				Report:   "",
 				Hockey:   false,
-				Strategy: "xlWithSupport",
+				Strategy: strategyName,
 			}
 			actualOutput, err := processInputEvents(inputEvents, flags)
 			if err != nil {
@@ -117,9 +121,11 @@ func readExpectedFile(filename string) ([]trainer.TrainerRecord, error) {
 
 // processInputEvents processes input events and generates output rows using the trainer package
 func processInputEvents(events []common.Event, flags trainer.Flags) ([]trainer.TrainerRecord, error) {
+	strategyName := flags.Strategy
+
 	if flags.Debug {
 		fmt.Printf("\n=== DEBUG: Starting event processing ===\n")
-		fmt.Printf("Processing %d events with xlWithSupport strategy\n", len(events))
+		fmt.Printf("Processing %d events with %s strategy\n", len(events), strategyName)
 	}
 
 	// Convert events to the format expected by the trainer package
@@ -136,7 +142,7 @@ func processInputEvents(events []common.Event, flags trainer.Flags) ([]trainer.T
 	}
 
 	// Get the default strategy
-	strategy, err := trainer.GetStrategy("xlWithSupport")
+	strategy, err := trainer.GetStrategy(strategyName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get strategy: %v", err)
 	}

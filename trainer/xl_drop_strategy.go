@@ -67,8 +67,11 @@ func (s *XLDropStrategy) Calculate(current, previous *TrainerRecord, flags Flags
 			total -= halfPart
 			realLoss = halfPart
 		} else if pattern == "YELLOW" {
-			// total -= realLoss
-			// realLoss = 0
+			// if flags.Hockey {
+			// 	halfPart := roundUp(realLoss / 2)
+			// 	total -= halfPart
+			// 	realLoss = halfPart
+			// }
 		} else if pattern == "GREEN" {
 			// total -= realLoss
 			// realLoss = 0

@@ -47,10 +47,6 @@ func (s *XLDropStrategy) Calculate(current, previous *TrainerRecord, flags Flags
 		"X": 0,
 		"L": 0,
 	}
-	coverageRatio := map[string]float64{
-		"X": 0,
-		"L": 0,
-	}
 
 	if uf > 0 || ux > 0 || ul > 0 {
 		realLoss := lossF + lossX + lossL - baseAmount*3
@@ -70,8 +66,8 @@ func (s *XLDropStrategy) Calculate(current, previous *TrainerRecord, flags Flags
 			total -= realLoss
 			realLoss = 0
 		} else if pattern == "YELLOW" {
-			total -= realLoss
-			realLoss = 0
+			// total -= realLoss
+			// realLoss = 0
 		} else if pattern == "GREEN" {
 			// total -= realLoss
 			// realLoss = 0
@@ -107,25 +103,16 @@ func (s *XLDropStrategy) Calculate(current, previous *TrainerRecord, flags Flags
 	}
 
 	if flags.Debug {
-		fmt.Printf("DEBUG: Event %d: coverageRatio_X: %.2f, deferLoss_X: %.0f\n", eventNumber, coverageRatio["X"], deferLoss["X"])
-		fmt.Printf("DEBUG: Event %d: coverageRatio_L: %.2f, deferLoss_L: %.0f\n", eventNumber, coverageRatio["L"], deferLoss["L"])
+		fmt.Printf("DEBUG: Event %d: deferLoss_X: %.2f, deferLoss_L: %.0f\n", eventNumber, deferLoss["X"], deferLoss["L"])
 	}
 
+	betF := calcBet(lossF, current.OddF)
 	betX := calcBet(lossX, current.OddX)
 	betL := calcBet(lossL, current.OddL)
-
-	// Корректировка lossF в зависимости от покрытия
-	coverX := roundUp(betX * coverageRatio["X"])
-	coverL := roundUp(betL * coverageRatio["L"])
-	lossF += coverX
-	lossF += coverL
-
-	betF := calcBet(lossF, current.OddF)
 
 	if flags.Debug {
 		fmt.Printf("DEBUG: Event %d: lossF: %.0f, lossX: %.0f, lossL: %.0f\n", eventNumber, lossF, lossX, lossL)
 		fmt.Printf("DEBUG: Event %d: betF: %.0f, betX: %.0f, betL: %.0f\n", eventNumber, betF, betX, betL)
-		fmt.Printf("DEBUG: Event %d: coverX: %.0f, coverL: %.0f\n", eventNumber, coverX, coverL)
 		fmt.Printf("DEBUG: Event %d: total BEFORE process %.0f\n", eventNumber, total)
 	}
 
@@ -137,8 +124,8 @@ func (s *XLDropStrategy) Calculate(current, previous *TrainerRecord, flags Flags
 		ul++
 		// Потери
 		lossF = 0
-		lossX += betX - coverX
-		lossL += betL - coverL
+		lossX += betX
+		lossL += betL
 	} else if current.Result == "X" {
 		// Серии
 		uf++

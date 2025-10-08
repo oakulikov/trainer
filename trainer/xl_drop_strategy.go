@@ -162,6 +162,18 @@ func (s *XLDropStrategy) Calculate(current, previous *TrainerRecord, flags Flags
 			total += baseAmount
 		}
 	}
+	if current.Result == "N" && flags.Real {
+		// Серии
+		uf = -1
+		ux = -1
+		ul = -1
+		// Потери
+		lossF = -1
+		lossX = -1
+		lossL = -1
+	} else if current.Result == "N" {
+		panic("current.Result N w/o flags.Real")
+	}
 
 	if flags.Debug {
 		fmt.Printf("DEBUG: Event %d: total FINAL %.0f\n", eventNumber, total)

@@ -1,15 +1,13 @@
 package tests
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
-	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/holygun/go-trainer/common"
 	"github.com/holygun/go-trainer/trainer"
 
 	"github.com/stretchr/testify/assert"
@@ -73,7 +71,16 @@ func TestRegressionSuite(t *testing.T) {
 			}
 
 			// Process the input events and generate actual output
-			actualOutput, err := processInputEvents(inputEvents, *debug)
+			flags := trainer.Flags{
+				Input:    "",
+				Output:   "",
+				Verbose:  false,
+				Debug:    *debug,
+				Report:   "",
+				Hockey:   false,
+				Strategy: "xlWithSupport",
+			}
+			actualOutput, err := processInputEvents(inputEvents, flags)
 			if err != nil {
 				t.Fatalf("Failed to process input events: %v", err)
 			}
@@ -98,65 +105,9 @@ func TestRegressionSuite(t *testing.T) {
 	}
 }
 
-// Event represents a single event from the input file
-type Event struct {
-	Result string
-	OddF   float64
-	OddX   float64
-	OddL   float64
-}
-
 // readInputFile reads and parses an .input file
-func readInputFile(filename string) ([]Event, error) {
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	var events []Event
-	scanner := bufio.NewScanner(file)
-
-	// Skip header line
-	if !scanner.Scan() {
-		return events, nil
-	}
-
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-
-		parts := strings.Split(line, ",")
-		if len(parts) != 4 {
-			return nil, fmt.Errorf("invalid line format in %s: %s", filename, line)
-		}
-
-		oddF, err := strconv.ParseFloat(parts[1], 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid oddF value in %s: %s", filename, parts[1])
-		}
-
-		oddX, err := strconv.ParseFloat(parts[2], 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid oddX value in %s: %s", filename, parts[2])
-		}
-
-		oddL, err := strconv.ParseFloat(parts[3], 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid oddL value in %s: %s", filename, parts[3])
-		}
-
-		events = append(events, Event{
-			Result: parts[0],
-			OddF:   oddF,
-			OddX:   oddX,
-			OddL:   oddL,
-		})
-	}
-
-	return events, scanner.Err()
+func readInputFile(filename string) ([]common.Event, error) {
+	return common.ReadInputFile(filename)
 }
 
 // readExpectedFile reads and parses an .expected file
@@ -165,8 +116,8 @@ func readExpectedFile(filename string) ([]trainer.TrainerRecord, error) {
 }
 
 // processInputEvents processes input events and generates output rows using the trainer package
-func processInputEvents(events []Event, debug bool) ([]trainer.TrainerRecord, error) {
-	if debug {
+func processInputEvents(events []common.Event, flags trainer.Flags) ([]trainer.TrainerRecord, error) {
+	if flags.Debug {
 		fmt.Printf("\n=== DEBUG: Starting event processing ===\n")
 		fmt.Printf("Processing %d events with xlWithSupport strategy\n", len(events))
 	}
@@ -190,27 +141,16 @@ func processInputEvents(events []Event, debug bool) ([]trainer.TrainerRecord, er
 		return nil, fmt.Errorf("failed to get strategy: %v", err)
 	}
 
-	if debug {
+	if flags.Debug {
 		fmt.Printf("Strategy loaded: %s - %s\n", strategy.Name(), strategy.Description())
 		fmt.Printf("Event sequence (oldest to newest): %s\n", strings.Join(eventStrings, "/"))
 		fmt.Printf("\n=== DEBUG: Step-by-step processing ===\n")
 	}
 
-	// Create flags structure
-	flags := trainer.Flags{
-		Input:    "",
-		Output:   "",
-		Verbose:  false,
-		Debug:    debug,
-		Report:   "",
-		Hockey:   false,
-		Strategy: "xlWithSupport",
-	}
-
 	// Generate records using the trainer package with specified odds
 	records := trainer.GenerateRecordsWithOdds(eventStrings, odds, flags, strategy)
 
-	if debug {
+	if flags.Debug {
 		fmt.Printf("\n=== DEBUG: Generated records (oldest to newest) ===\n")
 		for i, record := range records {
 			fmt.Printf("Step %d: %s,%.2f,%.2f,%.2f -> bets: %.0f,%.0f,%.0f, losses: %.0f,%.0f,%.0f, total: %.0f, streaks: %.0f,%.0f,%.0f, pattern: %s\n",
@@ -223,7 +163,7 @@ func processInputEvents(events []Event, debug bool) ([]trainer.TrainerRecord, er
 	// Reverse records to match expected format (newest first)
 	records = trainer.ReverseRecords(records)
 
-	if debug {
+	if flags.Debug {
 		fmt.Printf("\n=== DEBUG: Final records (newest to oldest) ===\n")
 		for i, record := range records {
 			fmt.Printf("Record %d: %s,%s,%.2f,%.2f,%.2f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f\n",

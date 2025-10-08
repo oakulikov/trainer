@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/holygun/go-trainer/common"
 )
 
 // Flags содержит все флаги командной строки
@@ -20,6 +22,7 @@ type Flags struct {
 	Report   string
 	Hockey   bool
 	Strategy string
+	Real     bool
 }
 
 const DEFAULT_BET = 10000
@@ -36,6 +39,27 @@ var patterns = []Pattern{
 	{"RED", "three or more metrics > 20 * DEFAULT_BET"},
 	{"YELLOW", "two or more metrics > 10 * DEFAULT_BET or one metric > 20 * DEFAULT_BET"},
 	{"GREEN", "one metric > 10 * DEFAULT_BET"},
+}
+
+// Зарегистрированные флаги для фильтрации файлов
+var registeredFlags = map[string]bool{
+	"hockey": false,
+}
+
+// RegisterFlag регистрирует новый флаг
+func RegisterFlag(flag string) {
+	registeredFlags[flag] = true
+}
+
+// IsFlagRegistered проверяет, зарегистрирован ли флаг
+func IsFlagRegistered(flag string) bool {
+	_, ok := registeredFlags[flag]
+	return ok
+}
+
+// GetRegisteredFlags возвращает список зарегистрированных флагов
+func GetRegisteredFlags() map[string]bool {
+	return registeredFlags
 }
 
 // PatternDetector детектор паттернов
@@ -432,6 +456,11 @@ func ReadCSV(filename string) ([]TrainerRecord, error) {
 	}
 
 	return trainerRecords, nil
+}
+
+// ReadInputFile читает и парсит .input файл
+func ReadInputFile(filename string) ([]common.Event, error) {
+	return common.ReadInputFile(filename)
 }
 
 // SaveToCSV сохраняет записи в CSV файл

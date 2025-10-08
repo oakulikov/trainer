@@ -3,7 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/holygun/go-trainer/trainer"
@@ -22,6 +25,7 @@ func main() {
 		printReport  = flag.String("report", "", "Имя входного CSV файла")
 		hockey       = flag.Bool("hockey", false, "События хоккея")
 		strategyName = flag.String("strategy", "xlWithSupport", "Имя стратегии для использования")
+		realGames    = flag.Bool("real", false, "Обработка реальных игр из папки real-games")
 	)
 	flag.Parse()
 
@@ -34,10 +38,21 @@ func main() {
 		Report:   *printReport,
 		Hockey:   *hockey,
 		Strategy: *strategyName,
+		Real:     *realGames,
 	}
 
 	if flags.Report != "" {
 		readCSVAndPrint(flags.Report)
+		return
+	}
+
+	if flags.Real {
+		if flags.Hockey {
+			trainer.RegisterFlag("hockey")
+		}
+		// Собираем активные флаги
+		activeFlags := trainer.GetRegisteredFlags()
+		processRealGames(flags, activeFlags)
 		return
 	}
 
@@ -100,4 +115,177 @@ func readCSVAndPrint(filename string) {
 func generateStatsAndPrint(records []trainer.TrainerRecord, eventsFromOldest []string) {
 	stats := trainer.CalculateStats(records, eventsFromOldest)
 	trainer.PrintReport(stats, records)
+}
+
+// processRealGames обрабатывает реальные игры из папки real-games
+func processRealGames(flags trainer.Flags, activeFlags map[string]bool) {
+	realGamesDir := "real-games"
+
+	// Проверяем существование папки
+	if _, err := os.Stat(realGamesDir); os.IsNotExist(err) {
+		fmt.Printf("Папка %s не существует. Создаем...\n", realGamesDir)
+		if err := os.MkdirAll(realGamesDir, 0755); err != nil {
+			log.Fatalf("Ошибка создания папки %s: %v", realGamesDir, err)
+		}
+		fmt.Printf("Папка %s создана. Добавьте .input файлы для обработки.\n", realGamesDir)
+		return
+	}
+
+	// Читаем все файлы в папке
+	files, err := ioutil.ReadDir(realGamesDir)
+	if err != nil {
+		log.Fatalf("Ошибка чтения папки %s: %v", realGamesDir, err)
+	}
+
+	// Фильтруем .input файлы
+	var inputFiles []os.FileInfo
+	for _, file := range files {
+		if !file.IsDir() && strings.HasSuffix(file.Name(), ".input") {
+			inputFiles = append(inputFiles, file)
+		}
+	}
+
+	if len(inputFiles) == 0 {
+		fmt.Printf("В папке %s не найдено .input файлов\n", realGamesDir)
+		return
+	}
+
+	fmt.Printf("Найдено %d .input файлов в папке %s\n", len(inputFiles), realGamesDir)
+
+	// Обрабатываем каждый файл
+	for _, file := range inputFiles {
+		processInputFile(filepath.Join(realGamesDir, file.Name()), flags, activeFlags)
+	}
+}
+
+// processInputFile обрабатывает один input файл
+func processInputFile(filePath string, flags trainer.Flags, activeFlags map[string]bool) {
+	fileName := filepath.Base(filePath)
+
+	// Проверяем наличие флага в имени файла
+	baseName := strings.TrimSuffix(fileName, ".input")
+	parts := strings.Split(baseName, "-")
+
+	strategy, err := trainer.GetStrategy(parts[0])
+	if err != nil {
+		fmt.Printf("Ошибка получения стратегии: %v\n", err)
+		return
+	}
+
+	var fileFlag string
+	if len(parts) > 1 {
+		fileFlag = parts[len(parts)-1]
+	}
+
+	if flags.Debug {
+		fmt.Printf("DEBUG: Файл %s, флаг: %s\n", fileName, fileFlag)
+	}
+
+	// Проверяем, нужно ли обрабатывать этот файл
+	if fileFlag != "" {
+		// Если у файла есть флаг, проверяем, зарегистрирован ли он
+		if !trainer.IsFlagRegistered(fileFlag) {
+			fmt.Printf("Ошибка: флаг '%s' в файле %s не зарегистрирован\n", fileFlag, fileName)
+			fmt.Printf("Зарегистрированные флаги: %v\n", trainer.GetRegisteredFlags())
+			os.Exit(1)
+		}
+
+		// Если есть активные флаги, обрабатываем только файлы с этими флагами
+		if len(activeFlags) > 0 {
+			if !activeFlags[fileFlag] {
+				if flags.Debug {
+					fmt.Printf("DEBUG: Пропускаем файл %s (флаг %s не активен)\n", fileName, fileFlag)
+				}
+				return
+			}
+		} else {
+			// Если активных флагов нет, пропускаем файлы с флагами
+			if flags.Debug {
+				fmt.Printf("DEBUG: Пропускаем файл %s (есть флаг %s, но активные флаги не указаны)\n", fileName, fileFlag)
+			}
+			return
+		}
+	} else {
+		// Если у файла нет флага, но есть активные флаги, пропускаем его
+		if hasTrue(activeFlags) {
+			if flags.Debug {
+				fmt.Printf("DEBUG: Пропускаем файл %s (нет флага, но есть активные флаги)\n", fileName)
+			}
+			return
+		}
+	}
+
+	actualFilePath := strings.TrimSuffix(filePath, ".input") + ".actual"
+
+	// Проверяем существование actual файла и сравниваем количество строк
+	if _, err := os.Stat(actualFilePath); err == nil {
+		inputLines, err1 := countLines(filePath)
+		actualLines, err2 := countLines(actualFilePath)
+
+		if err1 == nil && err2 == nil && inputLines == actualLines {
+			fmt.Printf("Файл %s не требует обновления (количество строк совпадает)\n", fileName)
+			return
+		}
+	}
+
+	fmt.Printf("Обрабатываем файл: %s\n", fileName)
+
+	// Читаем input файл
+	events, err := trainer.ReadInputFile(filePath)
+	if err != nil {
+		fmt.Printf("Ошибка чтения файла %s: %v\n", fileName, err)
+		return
+	}
+
+	// Извлекаем события и коэффициенты
+	eventStrings := make([]string, len(events))
+	odds := make([]struct{ OddF, OddX, OddL float64 }, len(events))
+
+	for i, event := range events {
+		eventStrings[i] = event.Result
+		odds[i] = struct{ OddF, OddX, OddL float64 }{
+			OddF: event.OddF,
+			OddX: event.OddX,
+			OddL: event.OddL,
+		}
+	}
+
+	// Генерируем записи с использованием стратегии
+	generatedRecords := trainer.GenerateRecordsWithOdds(eventStrings, odds, flags, strategy)
+
+	// Сохраняем в actual файл
+	if err := trainer.SaveToCSV(generatedRecords, actualFilePath); err != nil {
+		fmt.Printf("Ошибка сохранения файла %s: %v\n", actualFilePath, err)
+		return
+	}
+
+	fmt.Printf("Файл %s успешно обработан и сохранен как %s\n", fileName, filepath.Base(actualFilePath))
+}
+
+// countLines подсчитывает количество строк в файле
+func countLines(filePath string) (int, error) {
+	content, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return 0, err
+	}
+
+	lines := strings.Split(string(content), "\n")
+	// Убираем пустые строки в конце
+	count := 0
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			count++
+		}
+	}
+
+	return count, nil
+}
+
+func hasTrue(m map[string]bool) bool {
+	for _, value := range m {
+		if value {
+			return true
+		}
+	}
+	return false
 }

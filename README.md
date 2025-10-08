@@ -32,9 +32,14 @@ go run main.go -input "F/X/L/F/F/X/L"
 - `-input` - Строка событий F/X/L, разделенных слешем
 - `-output` - Имя выходного CSV файла (по умолчанию: `trainer_output.csv`)
 - `-verbose` - Подробный вывод процесса обработки
+- `-debug` - Подробный вывод в тестах
 - `-report` - Имя входного CSV файла для генерации отчета
 - `-hockey` - Использовать события хоккея
 - `-strategy` - Имя стратегии для использования (по умолчанию: `xlWithSupport`)
+- `-real` - Обработка реальных игр из папки real-games
+- `-TEST` - Обрабатывать файлы с флагом TEST
+- `-PROD` - Обрабатывать файлы с флагом PROD
+- `-STAGING` - Обрабатывать файлы с флагом STAGING
 
 ### Примеры
 
@@ -57,6 +62,26 @@ go run main.go -input "F/X/L/F/F/X/L" -verbose
 ```bash
 go run main.go -input "F/X/L/F/F/X/L" -strategy xlWithSupport
 ```
+
+### Обработка реальных игр
+
+5. Базовая обработка реальных игр:
+```bash
+go run main.go -real -strategy xlDrop
+```
+
+6. С фильтрацией по флагам:
+```bash
+go run main.go -real -TEST -strategy xlDrop
+go run main.go -real -PROD -strategy xlDrop
+```
+
+7. С отладочным выводом:
+```bash
+go run main.go -real -debug -strategy xlDrop
+```
+
+Подробное руководство по использованию функциональности реальных игр см. в [`REAL_GAMES_GUIDE.md`](REAL_GAMES_GUIDE.md).
 
 ## Структура тестов
 

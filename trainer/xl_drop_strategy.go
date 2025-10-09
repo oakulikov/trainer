@@ -93,8 +93,13 @@ func (s *XLDropStrategy) Calculate(current, previous *TrainerRecord, flags Flags
 				fmt.Printf("DEBUG: Event %d: ratio: %.2f, smallPart: %.0f, bigPart: %.0f\n", eventNumber, ratio, smallPart, bigPart)
 			}
 
-			lossX += smallPart
-			lossL += bigPart
+			if flags.Hockey {
+				lossX += bigPart
+				lossL += smallPart
+			} else {
+				lossX += smallPart
+				lossL += bigPart
+			}
 		}
 	}
 

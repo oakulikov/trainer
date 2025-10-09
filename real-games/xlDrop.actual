@@ -1,2 +1,2 @@
 event_number,result,oddF,oddX,oddL,betF,betX,betL,lossF,lossX,lossL,total,uf,ux,ul,pattern
-1,N,1.88,3.60,4.50,11400,3850,2900,-1,-1,-1,0,-1,-1,-1,
+1,X,1.88,3.60,4.50,11400,3850,2900,21400,0,12900,10000,1,0,1,

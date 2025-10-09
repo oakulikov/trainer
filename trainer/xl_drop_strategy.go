@@ -171,7 +171,7 @@ func (s *XLDropStrategy) Calculate(current, previous *TrainerRecord, flags Flags
 		lossF = -1
 		lossX = -1
 		lossL = -1
-	} else if current.Result == "N" {
+	} else if current.Result == "N" && !flags.Testing {
 		panic("current.Result N w/o flags.Real")
 	}
 

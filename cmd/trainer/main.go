@@ -26,6 +26,7 @@ func main() {
 		hockey       = flag.Bool("hockey", false, "События хоккея")
 		strategyName = flag.String("strategy", "xlDrop", "Имя стратегии для использования")
 		realGames    = flag.Bool("real", false, "Обработка реальных игр из папки real-games")
+		force        = flag.Bool("force", false, "Игнорирование отдельных ограничений")
 	)
 	flag.Parse()
 
@@ -39,6 +40,8 @@ func main() {
 		Hockey:   *hockey,
 		Strategy: *strategyName,
 		Real:     *realGames,
+		Force:    *force,
+		Testing:  false,
 	}
 
 	if flags.Report != "" {
@@ -224,7 +227,7 @@ func processInputFile(filePath string, flags trainer.Flags, realGamesFlags map[s
 		inputLines, err1 := countLines(filePath)
 		actualLines, err2 := countLines(actualFilePath)
 
-		if err1 == nil && err2 == nil && inputLines == actualLines {
+		if err1 == nil && err2 == nil && inputLines == actualLines && !flags.Force {
 			fmt.Printf("Файл %s не требует обновления (количество строк совпадает)\n", fileName)
 			return
 		}

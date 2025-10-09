@@ -23,6 +23,8 @@ type Flags struct {
 	Hockey   bool
 	Strategy string
 	Real     bool
+	Force    bool
+	Testing  bool
 }
 
 const DEFAULT_BET = 10000

@@ -24,7 +24,7 @@ func main() {
 		debug        = flag.Bool("debug", false, "Подробный вывод в тестах")
 		printReport  = flag.String("report", "", "Имя входного CSV файла")
 		hockey       = flag.Bool("hockey", false, "События хоккея")
-		strategyName = flag.String("strategy", "xlWithSupport", "Имя стратегии для использования")
+		strategyName = flag.String("strategy", "xlDrop", "Имя стратегии для использования")
 		realGames    = flag.Bool("real", false, "Обработка реальных игр из папки real-games")
 	)
 	flag.Parse()
@@ -46,13 +46,14 @@ func main() {
 		return
 	}
 
+	realGamesFlags := map[string]bool{
+		"hockey": false,
+	}
 	if flags.Real {
 		if flags.Hockey {
-			trainer.RegisterFlag("hockey")
+			realGamesFlags["hockey"] = true
 		}
-		// Собираем активные флаги
-		activeFlags := trainer.GetRegisteredFlags()
-		processRealGames(flags, activeFlags)
+		processRealGames(flags, realGamesFlags)
 		return
 	}
 
@@ -118,7 +119,7 @@ func generateStatsAndPrint(records []trainer.TrainerRecord, eventsFromOldest []s
 }
 
 // processRealGames обрабатывает реальные игры из папки real-games
-func processRealGames(flags trainer.Flags, activeFlags map[string]bool) {
+func processRealGames(flags trainer.Flags, realGamesFlags map[string]bool) {
 	realGamesDir := "real-games"
 
 	// Проверяем существование папки
@@ -154,12 +155,12 @@ func processRealGames(flags trainer.Flags, activeFlags map[string]bool) {
 
 	// Обрабатываем каждый файл
 	for _, file := range inputFiles {
-		processInputFile(filepath.Join(realGamesDir, file.Name()), flags, activeFlags)
+		processInputFile(filepath.Join(realGamesDir, file.Name()), flags, realGamesFlags)
 	}
 }
 
 // processInputFile обрабатывает один input файл
-func processInputFile(filePath string, flags trainer.Flags, activeFlags map[string]bool) {
+func processInputFile(filePath string, flags trainer.Flags, realGamesFlags map[string]bool) {
 	fileName := filepath.Base(filePath)
 
 	// Проверяем наличие флага в имени файла
@@ -184,15 +185,16 @@ func processInputFile(filePath string, flags trainer.Flags, activeFlags map[stri
 	// Проверяем, нужно ли обрабатывать этот файл
 	if fileFlag != "" {
 		// Если у файла есть флаг, проверяем, зарегистрирован ли он
-		if !trainer.IsFlagRegistered(fileFlag) {
+		_, ok := realGamesFlags[fileFlag]
+		if !ok {
 			fmt.Printf("Ошибка: флаг '%s' в файле %s не зарегистрирован\n", fileFlag, fileName)
-			fmt.Printf("Зарегистрированные флаги: %v\n", trainer.GetRegisteredFlags())
+			fmt.Printf("Зарегистрированные флаги: %v\n", realGamesFlags)
 			os.Exit(1)
 		}
 
 		// Если есть активные флаги, обрабатываем только файлы с этими флагами
-		if len(activeFlags) > 0 {
-			if !activeFlags[fileFlag] {
+		if len(realGamesFlags) > 0 {
+			if !realGamesFlags[fileFlag] {
 				if flags.Debug {
 					fmt.Printf("DEBUG: Пропускаем файл %s (флаг %s не активен)\n", fileName, fileFlag)
 				}
@@ -207,7 +209,7 @@ func processInputFile(filePath string, flags trainer.Flags, activeFlags map[stri
 		}
 	} else {
 		// Если у файла нет флага, но есть активные флаги, пропускаем его
-		if hasTrue(activeFlags) {
+		if hasTrue(realGamesFlags) {
 			if flags.Debug {
 				fmt.Printf("DEBUG: Пропускаем файл %s (нет флага, но есть активные флаги)\n", fileName)
 			}

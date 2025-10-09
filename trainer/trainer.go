@@ -41,27 +41,6 @@ var patterns = []Pattern{
 	{"GREEN", "one metric > 10 * DEFAULT_BET"},
 }
 
-// Зарегистрированные флаги для фильтрации файлов
-var registeredFlags = map[string]bool{
-	"hockey": false,
-}
-
-// RegisterFlag регистрирует новый флаг
-func RegisterFlag(flag string) {
-	registeredFlags[flag] = true
-}
-
-// IsFlagRegistered проверяет, зарегистрирован ли флаг
-func IsFlagRegistered(flag string) bool {
-	_, ok := registeredFlags[flag]
-	return ok
-}
-
-// GetRegisteredFlags возвращает список зарегистрированных флагов
-func GetRegisteredFlags() map[string]bool {
-	return registeredFlags
-}
-
 // PatternDetector детектор паттернов
 type PatternDetector struct {
 	recentEvents []string

@@ -107,6 +107,8 @@ func TestRegressionSuite(t *testing.T) {
 				}
 			}
 
+			// trainer.SaveToCSV(actualOutput, strings.TrimSuffix(testFile, ".input") + ".actual")
+
 			// Compare the actual output with results output
 			assert.Equal(t, resultsOutput, actualOutput, "Output mismatch for %s", testFile)
 
